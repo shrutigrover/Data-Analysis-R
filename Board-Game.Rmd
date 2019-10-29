@@ -1,0 +1,116 @@
+---
+title: "R Notebook - Explore Board Game Data- Plot Average Rating and game Publishing Year using jitter plot, box plot and violin plot"
+author: Shruti Grover
+date: May 28, 2019
+output: html_document
+---
+
+### (I) Objective :<br />
+
+1. To read board game data and understand the structure of data.
+
+2. Plot point and jitter plots of 'average_rating' v/s 'year_published' with transparency of points based on number of user ratings. 
+
+3. Analyse the difference between the two plots and cases when one is better than the other.
+
+**Solution Approach**:</br>
+The csv file was read from the link provided in the assignment and glimpse() method was used to see the overview of how data looks like. Then using geom_point and geom_jitter methods, the two plots were created. The outputs of the two plots was compared. Below are the code chunks.
+
+```{r libraries}
+#load libraries
+library(tidyverse)
+library(gridExtra)
+bg <- read.csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-03-12/board_games.csv")
+#print structure of data
+glimpse(bg)
+```
+
+
+Point and Jitter Plots -
+```{r plots}
+graph <- ggplot(dat=bg, aes(x = year_published, y =  average_rating,alpha = users_rated))+
+  theme(legend.position = "bottom")+
+  guides(alpha = guide_legend("Users Rated"), color = FALSE)
+grid.arrange(graph + geom_point(color="red")+ ggtitle("Point Plot"), graph + geom_jitter()+ggtitle("Jitter Plot"), ncol = 2)
+```
+
+* Geom_point and geom_jitter functions are used to plot a scatter plot. However, there are cases when many data points that lie close to each other or overlap. This results in less distinction between data points(also called Overplotting)
+
+* To resolve this issue of overplotting, geom_jitter() method is used that adds small random noise to the data points. By adding a random offset, overlapping of points is prevented, hence giving a better visualisaton. Refering to the above plots, we can see discrete verticle lines in point plot, however, the points are more dispersed in the jitter plot.
+
+
+### (II) Objective:<br />
+
+1. Filter 'Category' variable and create a new variable called 'type' in a separate dataframe bg2.
+
+2. Plot 'average_rating' v/s 'type' on jitter, boxplot and violin plot and analyse how different types of plots provide unique information about the data. Compare the three plots.
+
+**Solution Approach**:</br>
+A method was created which is given the category variable of the data sample as the input, it finds whether the variable contains Card game or Dice game or both and returns the type accordingly. Geom methods were used to plot the jitter, boxplot and violin plots. The output of the plots was compared. Below is the code chunk.
+```{r filter}
+bg2 <- bg %>%
+  filter(grepl('Card Game|Dice',category))
+# below is a function that assigns value to variable 'type' based on category value
+getType <- function(cat) {
+  ifelse(grepl('Card Game',cat) & grepl('Dice',cat),'Both',ifelse(grepl('Card Game',cat),'Card','Dice'))
+}
+bg2$type <- getType(bg2$category)
+g2 <- ggplot(dat=bg2, aes(x = type, y =  average_rating, alpha = users_rated, color = type))+
+  scale_alpha(guide = 'none')
+grid.arrange(g2 + geom_jitter(), g2 + geom_boxplot(), g2+ geom_violin())
+```
+
+**Information provided by the three plots - **
+
+1. **geom_jitter** - From the above jitter plot, it can be observed that number of average_ratings, i.e the sample size of 'Card' game is the highest whereas the number of average ratings for games of type 'both' card and dice are the lowest. In this plot, we can also see from the transparency of the data point that how many users have provided the rating(less transparency corresponding to lesser users). However, this plot does not give much idea about the distribution of the data. 
+
+2. **geom_boxplot** - From the above boxplot, it can be evidently seen that the number of outliers are large and the variability of average_ratings is least in case of 'Card' games. Whereas, the variability of average_ratings is highest for 'Dice' games. The boxplot gives a represenation of range and distribution of the data, through which we can find the minimum, maximum, median values as well as the outliers.
+
+3. **geom_violin** - This plot is combination of boxplot and histogram and gives better information about distribution(eg, if the distribution is normal or not), and if skewness is present. From the above violin plot, we can observe that the distribution for 'both' type is not normal. Aslo, the distribution is left skewed for all the types due to the presence of outliers.
+
+**Is one plot superior to others?**
+
+When the sample size is large, for example, in our case 'Card' type game has large sample size, there is overlapping of points and the interpretation from jitter plot becomes difficult. In such cases, plots like violin and boxplot become more useful as we can learn about the distribution of data and number of outliers.
+
+However, the violin and boxplots do not give information about the number of samples/data points. Therefore, jitter plots are better for viewing the difference in sample sizes different categories.
+
+
+### (III) Objective:<br />
+
+1. Rank the games from best to worst based on average_rating.
+
+2. Create a plot to answer a question asked about the data. Make it a publishable plot.
+
+**Solution Approach**:</br>
+
+I have selected the following question which will be answered by the below analysis : 
+
+**"Are the games for which minimum players required are more than or equal to 2 ranked higher than the games having minimum players requirement of less than 2 ?"**
+
+First, it was seen that most of the samples have minimum player values of 1, 2, 3 and 4. Then, a jitter plot and a line plot was created, where the line represents the mean of Rank values. The mean statistical measure was used to compare the average ratings at these dominant points of 1, 2, 3 and 4. The code chunks and analysis is given below. 
+```{r ranking}
+bg <- bg %>% arrange(average_rating)
+bg$Rank <- rank(-bg$average_rating)
+#checking the frequency of unique values of min_players
+as.data.frame(table(bg$min_players))
+```
+
+
+```{r plotrank}
+ggplot(aes(x=min_players,y=Rank),data = bg)+
+  geom_jitter(alpha = 1/10, color = "orange")+
+  geom_line(aes(color = "blue"),stat='summary', fun.y = mean, show.legend = TRUE)+
+  scale_colour_manual(values = c("blue"),labels=c("Mean of Rank"))+
+  scale_x_discrete(limits=c("1","2","3","4","5"), name = "Minimum Number of Players")+
+  scale_y_discrete(limits=c(1,10532),name="Rank of Game (Best to Worst)")+
+  ggtitle("Rank of Games v/s Minimum Players")+
+  theme_light()+
+  theme(plot.title = element_text(hjust = 0.5), legend.title = element_blank(),legend.position = c(0.9, 0.08), legend.direction = "horizontal")+
+  labs(caption = "This figure shows the relation between the Rank of Games and the minimum number of players required \n to play the game. It can be seen that the Rank decreases after minimum player value of 2.")+
+  theme(plot.caption = element_text(hjust = 0.5))
+```
+
+Rank 1 represents the best game and Rank 10,532 represents the worst ranked game.
+From analysing the above plot, we can see the games for which minimum number of players required are 2 or more, are ranked lower(have lower average rating) than the games with minimum number of 1. A possible reason can be because people tend to enjoy single player games and with multi player games, the competition and expectation of players increases, hence the lesser rating.
+
+Although, the rank becomes better after 4 but it can be seen from the graph and frequency distribution table above that there are very few samples having minimum players of 5 or more. Hence, unless more samples are provided for the values of 5 or more, the data points can be ignored for our analysis.
