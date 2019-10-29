@@ -1,0 +1,183 @@
+---
+title: "GDP and Life Expectancy Data Analysis"
+output: html_document
+author: Shruti Grover
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index1.html'))})
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages}
+library(tidyverse)
+library(gapminder)
+library(car)
+library(gridExtra)
+```
+**Q1. Objective : To assess the normality of Life Expectancy in the Americas in the year 2007.**
+
+1. First, we will use a histogram and a qqplot to understand the distribution of data -
+
+```{r}
+gp <- gapminder %>%
+  filter(continent=="Americas" & year=="2007")
+g1 <- ggplot(subset(gapminder, continent=="Americas" & year=="2007"))
+grid.arrange(g1 + geom_histogram(aes(x= lifeExp), bins = 30)+
+               ggtitle("Distribution of life expectancy"), g1 + stat_qq(aes(sample = lifeExp))+ggtitle("QQ plot"))
+```
+
+From the above plots it can be observed that the distribution is nearly normal with a bit of negative skewness, which is also evident by the qqplot.
+
+2. Next, we will use the Shapiro-Wilk test- 
+```{r}
+shapiro.test(gp$lifeExp)
+```
+From the above output, the p-value > 0.05 implies that the distribution of the data is not significantly different from normal distribution. In other words, we can assume normality.
+
+**Q2. Objective : To find if there are 'population' outliers when comparing Asian countries to European countries in 1952.**
+
+```{r}
+gp2 <- gapminder %>%
+  filter((continent=="Asia" | continent == "Europe") & year == "1952")
+g2 <- ggplot(data = gp2, aes(x=continent,y=pop))
+grid.arrange(g2+geom_boxplot() + ggtitle("Box Plot of original data"), g2+geom_boxplot(aes(x = continent, y = log10(pop))) + ggtitle("Box Plot with log transformation"))
+  
+```
+From the above plots it can be observed that both continents "Asia" and "Europe" have outliers. Below are few of the common ways to handle outliers -
+
+1. **Remove outliers** : This method is used when the outlier values are not possible/realistic. However, in this case removing outliers is not an appropriate option as the population values are legitimate.
+
+2. **Transform data** : The values can be tranformed to log, square root, percentile. These are just few of the methods for transormation, there can be other possible tranformations too.
+
+3. **Change score** : This means to change the outlier value to +1 of the next highest value or to 3 standard deviation above mean. However, changing score is not considered a good option as the outlier value gets changed.
+
+**Method used for this comparison** - In our case we have used log tranformation to handle data and from the above plot it can be observed that this method has handled the outliers really well which results in no outliers for Asia and a couple for Europe.
+
+As population of a continent is an important and legitimate value, removing and changing the values of outliers is not a good option and leads to improper analysis.
+
+**Q3. Objective:**
+1. To conduct the appropriate statistical test, demonstrate the underlying assumptions, plot the results, and briefly report the results in a publishable format.
+2. To answer a research question.
+
+Below is the research question we will be answering:
+
+ **"Is life expectancy greater in Europe compared to Asia in 2007?"**
+
+I. Statistical tests and Assumptions : 
+
+An independent t-test will be used to compare life expectancy of Europe and Asia in year 2007. The Kolmogorov-Smirnov test will be used to test for normality, and Levene’s test for homogeneity of variance. Significance will be set at α < 0.05.
+
+1. Normality
+```{r}
+gp3 <- gapminder %>%
+  filter((continent == "Asia" | continent == "Europe") & year == "2007")
+ggplot(dat=gp3) +
+  stat_qq(aes(sample = lifeExp))
+ks.test(x=gp3$lifeExp, y="pnorm", mean=mean(gp3$lifeExp), sd=sd(gp3$lifeExp))
+```
+From the above output, the p-value > 0.05 implies that the distribution of the data is not significantly different from normal distribution. In other words, we can assume the normality.
+
+2. Homogeneity of variance :
+
+```{r}
+leveneTest(lifeExp~continent, data = gp3)
+```
+The Levene’s test uses an F-test to test the null hypothesis that the variance is equal across groups.
+A p value less than .05 in this case indicates a violation of the assumption, i.e, the variance of life expectancy is unequal among the two countries, Asia and Europe. However, we can handle the violation of this assumption in R by the options to either assume or not assume homogeneity of variance.
+
+3. Interval Data : Life Expectancy is an interval data as it consists of continuous values. Hence, this assumption is satisfied.
+
+```{r}
+gp3$lifeExp
+```
+
+4. Independence : The life expectancy of people in Europe is independent of that of Asia. Hence, this assumption is satisfied.
+
+Now, after testing the assumptions we can proceed with the independent t-test to check if the life expectancy greater in Europe compared to Asia -
+
+```{r}
+t.test(formula = gp3$lifeExp ~ gp3$continent,
+       data = gp3,
+       alternative = "two.sided",
+       var.equal = TRUE,
+       paired = FALSE)
+```
+For a t-test, the null hypothesis is that the means for both groups are equal, versus the alternative hypothesis that the means are not equal. As the p-value above is small (<0.05), the null hypothesis can be rejected and alternative hypothesis is true, i.e, the means of life expectancy in Asia and Europe are not equal.
+
+```{r}
+ggplot(dat = gp3, aes(x = continent, y = lifeExp, color = continent)) +
+  geom_boxplot()+ 
+  ggtitle("Life Expectancy comparison in Asia and Europe for year 2007") + 
+  xlab("Year") + 
+  ylab("Life Expectancy")
+```
+
+**Results:**
+From the above tests, it was found that the Life Expectancy in Asia and Europe (D=0.14712; p >0.05) was normal. However, life expectancy in Asia and Europe had unequal variance (F=9.0017 ; p=0.003902). This was handled by assuming homogenity of variance while performing the t-test. The independent t-test shows that the mean of life expectancy in Asia and Europe are unequal and life expectancy Asia is smaller than in Europe(70.72848 v/s 77.64860, P=3.34e-05) in year 2007.
+
+**Question : "Does GDP increase between 1985 and 1995 in Asia?"**
+
+An independent t-test will be used to analyze difference between GDP in year 1987 and 1997. The Kolmogorov-Smirnov test will be used to test for normality, and Levene’s test for homogeneity of variance. If data is found to be non-normal, data will be log-transformed. Significance will be set at α < 0.05.
+
+```{r}
+gdp <- gapminder %>% 
+  filter(continent == "Asia" & (year == "1987" | year == "1997"))
+summary(gdp)
+```
+
+Testing Assumptions :
+1. Normality
+2. Homogeneity of Variance
+3. Interval Data
+4. Independence
+```{r}
+#1. Normality
+gg <- ggplot(dat=gdp) 
+grid.arrange(gg+stat_qq(aes(sample = gdpPercap))+ggtitle("QQ Plot"), gg +  geom_violin(aes(x = factor(year), y = gdpPercap))+xlab("Year")+ggtitle("Violin Plot"))
+ks.test(x=gdp$gdpPercap, y="pnorm", mean=mean(gdp$gdpPercap), sd=sd(gdp$gdpPercap))
+
+#log transformation to make the data normal
+gdp <- gdp %>% 
+  mutate(gdp_log = log10(gdpPercap))
+
+gg2 <- ggplot(dat=gdp)
+grid.arrange(gg2+stat_qq(aes(sample = gdp_log))+ggtitle("QQ Plot - Log Transformed"), gg2 +  geom_violin(aes(x = factor(year), y = gdp_log))+xlab("Year")+ylab("GDP per capita")+ggtitle("Violin Plot - Log Transformed"))
+ks.test(x=gdp$gdp_log, y="pnorm", mean=mean(gdp$gdp_log), sd=sd(gdp$gdp_log))
+
+#2. Homogenity of Variance
+leveneTest(gdp_log~factor(year), data = gdp)
+
+#3. Interval Data - gdpPercap is continuous data. Hence, meeting the assumption
+#4. Independence -  The GDP of continent Asia is independent of that of Asia. 
+```
+Above, we can see the violin and QQ plots with and without log transformation. Also, the results of the KS test shows that before log transormation, p < 0.05 that means data is non normal. However, after the tranformation p=0.2675 > 0.05, hence, satisfying normalcy.
+
+A p value more than .05 in this case indicates acceptance of the assumption, i.e, the variance of life expectancy is equal among the two countries.
+
+Statistical Test - 
+```{r}
+t.test(formula= gdp_log ~ year,
+       data = gdp,
+       alternative="two.sided",
+       var.equal=TRUE,
+       paired=FALSE)
+```
+
+
+```{r}
+ggplot(data=gdp, aes(x = factor(year), y = gdpPercap, colour = year)) +
+  geom_boxplot()+
+  ggtitle("GDP comparison in Asia for year 1987 and 1997 ") + 
+  xlab("Year") + 
+  ylab("GDP") + 
+  theme(legend.position = "none")
+```
+
+**Results**:
+From the above tests, it was found that the GDP per Capita for the year 1987 and 1997 (D=0.22578; p <0.05) was non-normal. Therefore, log-transformation was done. Using the log-transformed data, GDP had equal variance (F=0.0941; p=0.7601). The independent t-test  shows that the mean of GDP per capita in 1987 is almost equal to that of 1997 where GDP in 1987 is slightly smaller than GDP in 1997 (3.594727 v/s 3.676961, P=0.5494)
+                      
