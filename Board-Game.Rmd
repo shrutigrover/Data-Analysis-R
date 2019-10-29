@@ -1,8 +1,13 @@
 ---
-title: "R Notebook - Explore Board Game Data- Plot Average Rating and game Publishing Year using jitter plot, box plot and violin plot"
+title: "Explore Board Game Data - Compare Average Rating of Board games vs Dice games using jitter plot, box plot and violin plot"
 author: Shruti Grover
 date: May 28, 2019
 output: html_document
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 ---
 
 ### (I) Objective :<br />
