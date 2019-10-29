@@ -1,0 +1,302 @@
+---
+title: "Effect of Gender and Time(0s, 30s, 60s and 90s) after Exercise on Blood Flow"
+author: Shruti Grover
+date: June 26, 2019
+output: html_document
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'bloodFlowAnalysis.html'))})
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r cars}
+library(tidyverse)
+library(ez)
+library(e1071)
+library(car)
+library(tidyr)
+```
+**Q1. Objective - **
+    a. To see the effect of Sex on blood flow at time T0 by using appropriate T-test.
+    b. To see the effect of Sex on blood flow at time T0 through a one-way ANOVA.
+    c. To compare the t^2 and F values from the above tests.
+
+**Solution - **
+```{r pressure, echo=FALSE}
+#read data
+df <- read.csv("ECE608_A3_BloodFlow.csv")
+df1 <- na.omit(df)
+```
+
+a. Conducting an independent t-test as Male and Female are two independent groups -
+```{r}
+#Conducting independent t-test
+t.test(formula = df1$T0 ~ df1$Sex,
+       data = df1,
+       alternative = "two.sided",
+       var.equal = TRUE,
+       paired = FALSE)
+```
+The p value of 0.0001129 < 0.05 shows that there is a significant difference between the means of female and male flow at T0.
+
+b. Conducting One-way Anova -
+```{r}
+df1.ez <- ezANOVA(data = df1,
+                 dv = T0,
+                 wid = ID,
+                 between = Sex,
+                 type = 3, #sum of squares
+                 return_aov = TRUE)
+df1.ez
+```
+The p value = 0.000112851 < 0.05 signifies that there is significant difference between the means of female and male flow at T0.
+
+c. Comparison of the t value and F value:
+   t^2 value from t-test = (-4.1481)^2 = 17.2067
+   F value from Anova = 17.20693
+   We can see that both the values are equal. The reason is that 
+   F = (variance between groups / variance within groups ) 
+   and Variance = (sum of squares / degrees of freedom)
+   As the degrees of freedom is 1 because there are two groups, the computation of F value and t^2 values are same. Both the values greater than 1 signify that there is a significant difference between the means values of flow between Male and female.
+   
+**Q2. Objective - **
+  a. To examine whether Flow differs by exercise condition through a one-way ANOVA test.
+  b. To use t-tests with the Bonferroni correction method and assess main effects.
+  c. To apply the Tukey’s HSD method and assess the main effects.
+  d. to compare and analyse the p-values from the post-hoc t-tests and from the Tukey’s HSD.
+
+**Solution - **  
+a. one-way ANOVA test
+```{r}
+df2 <- na.omit(df)
+df_flow<-gather(df2, time, flow, 4:8)
+df_flow_b <- df_flow %>% mutate(ID = factor(seq(1,295,by=1)))
+df_flow_b.ez <- ezANOVA(data = df_flow_b,
+                 dv = flow,
+                 wid = ID,
+                 between = Cond,
+                 type = 3, #sum of squares
+                 return_aov = TRUE)
+df_flow_b.ez
+```
+Check assumptions -
+```{r}
+#Check normality of residuals - p = 0.4144 > 0.05 means normal data
+qqnorm(df_flow_b.ez[["aov"]][["residuals"]])
+ks.test(x = df_flow_b.ez[["aov"]][["residuals"]],
+        y = "pnorm",
+        mean = mean(df_flow_b.ez[["aov"]][["residuals"]]),
+        sd = sd(df_flow_b.ez[["aov"]][["residuals"]]))
+
+#HOV - levene test was done as part of Anova and it was found that p = 0.00042 < 0.05 means variance is not equal across groups but adjusted in the Pairwise t-test
+ggplot(data = df_flow_b, aes(x=Cond,y=flow))+
+  geom_boxplot()
+```
+
+**Summary** - A significant main effect for condition (Bike, Rest, Sprint and Weights) was found(F = 8.6 ; P = 1.727228e-05) on flow. This means there is a significant difference between the flows for some condition.
+
+Below are the Post hoc analysis done to find between which group there is difference.
+
+b. Post Hoc Analysis : Pairwise T-test
+```{r}
+pairwise.t.test(x = df_flow_b$flow,
+                g = df_flow_b$Cond,
+                paired = FALSE,
+                alternative = "two.sided",
+                p.adjust.method = "bonferroni",
+                var.equal = TRUE)
+#Return Means and SD for each group
+tapply(df_flow_b$flow, list(df_flow_b$Cond), mean)
+tapply(df_flow_b$flow, list(df_flow_b$Cond), sd)
+tapply(df_flow_b$flow, list(df_flow_b$Cond), length)
+```
+
+c. Post Hoc Analysis : Tukey's HSD
+```{r}
+#Can also use Tukey's HSD
+TukeyHSD(df_flow_b.ez[["aov"]])
+```
+d. Comparison of p-values -
+
+  i. The p values of Bonferonni T-test and Tukey's HSD are a bit different. However, the p
+  values show that in terms of significance, both show the same result, i.e, for example
+  weights-sprint comparison, the Bonferonni T-test p value(0.0042 < 0.05) is significant as
+  well as Tukey's HSD p-value (0.0038 < 0.05) shows a significant result.
+
+  ii. The reason of the difference in the p-values is the way the two methods adjust
+  the p-values. Although the Bonferonni T-test reduces the likelihood of making Type-1 error(by
+  shrinking the alpha value), however, the likelihood of making Type II error increases. 
+  
+  iii. On the other hand, Tukeys HSD method considers both the error terms. Further, Tukeys HSD
+  controls the family-wise error rate by adjsting the p values for multiple testing. Therefore,
+  whenenver the variance is equal across groups, Tukeys HSD is more reliable.
+  
+**Q3. Objective- **
+      a. To examine whether flow changes over time through a one-way Anova.
+      b. To create a classic Anova table.
+**Solution- **
+a. One-way Anova -
+```{r}
+df_flow_w.rm <- ezANOVA(data = df_flow,
+                  dv = flow,
+                  wid = ID,
+                  within = time,
+                  type = 3,
+                  return_aov = TRUE)
+df_flow_w.rm
+```
+```{r}
+#Check Assumptions
+qqPlot(df_flow_w.rm[["aov"]][["ID:time"]][["residuals"]])
+skewness(df_flow_w.rm[["aov"]][["ID:time"]][["residuals"]])
+kurtosis(df_flow_w.rm[["aov"]][["ID:time"]][["residuals"]])
+ks.test(x = df_flow_w.rm[["aov"]][["ID:time"]][["residuals"]],
+        y = "pnorm",
+        mean = mean(df_flow_w.rm[["aov"]][["ID:time"]][["residuals"]]),
+        sd = sd(df_flow_w.rm[["aov"]][["ID:time"]][["residuals"]]))
+```
+By checking the assumptions, with p-value = 0.7267, we can assume normality.
+
+Post-hoc test -
+```{r}
+#Repeated-Measures post-hoc:
+pairwise.t.test(x = df_flow$flow,
+                g = df_flow$time,
+                paired = TRUE,
+                alternative = "two.sided",
+                p.adjust.method = "bonferroni",
+                var.equal = TRUE)
+#Return Means and SD for each time
+tapply(df_flow$flow, list(df_flow$time), mean)
+tapply(df_flow$flow, list(df_flow$time), sd)
+tapply(df_flow$flow, list(df_flow$time), length)
+```
+
+```{r}
+ggplot(data = df_flow, aes(x=time,y=flow, group = 1, fill = time))+
+  stat_summary(geom = "line", fun.y = mean, size =1, color="red")+
+  stat_summary(geom = "point", fun.y = mean, size =2, color="black", shape=17)+
+  scale_x_discrete(name="time", limits=c("T0","T30","T60","T90","T120"))+
+  labs(caption = "Figure 1 : Flow change at time 0, 30, 60, 90 and 120 min after the Sprint Exercise")+
+  theme(plot.caption = element_text(hjust = 0.5), legend.position = "none")
+  
+```
+b. ANOVA Table - 
+
+Source        SS          df    MS         F 
+Time          24311.02    4     6077.755   7.906
+Error         178339.27   232   768.703     
+Subjects      317890.6    58    5480.87     
+Total         520540.89   294   1770.547
+
+Summary - 
+A one-way repeated measure Anova was done to analyse the difference in blood flow over time. It was found that there was a statistically significant effect of time on blood flow (F=7.906497;P=5.44032e-06). The normality assumption was tested using the Kolmogorov-Smirnov test and it was found that distribution was not significantly different than normal(P = 0.726). Post hoc analysis revealed that flow decreases from time 0 min to 30 min (115.75 vs 90.81) after the exercise, then slightly increases and decreases alternately at time 60 min, 90 min and 120 min (98.66 vs 90.98 vs 99.10). It can observed that the change of flow with time is not in single direction(Refer fig 1).
+
+**Q4. Objective-**
+      a. To examine the difference between men and women for the blood flow response for all
+      time(T0, T30, T60, T90 and T120) for Sprint exercise condition.
+      b. To recreate the classic ANOVA table.
+      
+**Solution -**
+
+```{r}
+df3 <- df_flow %>% 
+  filter(Cond == "Sprint") %>% 
+  mutate(ID = factor(rep(seq(1,14,by=1),5)))
+
+df3.ez <- ezANOVA(data = df3,
+                   dv = flow,
+                   wid = ID,
+                   within = time,
+                   between = Sex,
+                   type = 2,
+                   return_aov = TRUE)
+df3.ez
+```
+
+```{r}
+#Check Assumptions (new qqPlot function)
+qqPlot(df3.ez[["aov"]][["ID:time"]][["residuals"]])
+skewness(df3.ez[["aov"]][["ID:time"]][["residuals"]])
+kurtosis(df3.ez[["aov"]][["ID:time"]][["residuals"]])
+ks.test(x = df3.ez[["aov"]][["ID:time"]][["residuals"]],
+        y = "pnorm",
+        mean =mean(df3.ez[["aov"]][["ID:time"]][["residuals"]]),
+        sd = sd(df3.ez[["aov"]][["ID:time"]][["residuals"]]))
+```
+
+Post-Hoc test : Independent t-test -
+```{r}
+#Comparison for Sex male and female should also have been done
+# Independent t-test
+df3.T0 <- df3 %>% 
+  filter(time == "T0")
+pairwise.t.test(x = df3.T0$flow,
+                g = df3.T0$Sex,
+                paired = FALSE,
+                alternative = "two.sided",
+                p.adjust.method = "bonferroni")
+
+df3.T30 <- df3 %>% 
+  filter(time == "T30")
+pairwise.t.test(x = df3.T30$flow,
+                g = df3.T30$Sex,
+                paired = FALSE,
+                alternative = "two.sided",
+                p.adjust.method = "bonferroni")
+
+df3.T60 <- df3 %>% 
+  filter(time == "T60")
+pairwise.t.test(x = df3.T60$flow,
+                g = df3.T60$Sex,
+                paired = FALSE,
+                alternative = "two.sided",
+                p.adjust.method = "bonferroni")
+
+df3.T90 <- df3 %>% 
+  filter(time == "T90")
+pairwise.t.test(x = df3.T90$flow,
+                g = df3.T90$Sex,
+                paired = FALSE,
+                alternative = "two.sided",
+                p.adjust.method = "bonferroni")
+
+df3.T120 <- df3 %>% 
+  filter(time == "T120")
+pairwise.t.test(x = df3.T120$flow,
+                g = df3.T120$Sex,
+                paired = FALSE,
+                alternative = "two.sided",
+                p.adjust.method = "bonferroni")
+
+tapply(df3.T0$flow, list(df3.T0$Sex), mean)
+tapply(df3.T30$flow, list(df3.T30$Sex), mean)
+tapply(df3.T60$flow, list(df3.T60$Sex), mean)
+tapply(df3.T90$flow, list(df3.T90$Sex), mean)
+tapply(df3.T120$flow, list(df3.T120$Sex), mean)
+```
+```{r}
+ggplot(df3, aes(x=time, y=flow, fill=Sex)) +
+  geom_boxplot()+
+  scale_x_discrete(name="Time", limits=c("T0","T30","T60","T90","T120"))+
+  labs(caption = "Figure 2 : Difference between male and female flow at time 0, 30, 60, 90 and 120 min after the Sprint Exercise")+
+  theme(plot.caption = element_text(hjust = 0.5))
+```
+
+b. ANOVA Table
+
+Source          SS        df    MS         F
+time(RM)        7386.30   4     1846.575   2.66 
+Sex(Between)    18163.49  1     18163.49   4.78
+time x Sex      7849.29   4     1962.322   2.829
+Subject Error   45520.87  12    3793.405    
+Random Error    33291.68  48    693.57
+
+Summary - 
+
+A 2X5 (2 groups at 5 timepoints) mixed ANOVA was done to examine the difference of flow between men and women over different time periods(0 min, 30 min, 60 min, 90 min and 120 min after the exercise) for Sprint condition. A significant main effect for Sex was found (F=4.78;P=0.049 ). A significant main effect for time was found (F=2.66, P=0.043). A significant Sex x time interaction was found (F=2.82, P=0.034). Sphercity assumption was tested using Mauchly's Test for Sphericity(P = 0.18) as part of ANOVA and normality assumption was tested using the Kolmogorov-Smirnov test(P = 0.88). Both the assumptions were met. Post hoc analysis revealed that for the time 0 min and 60 min after the exercise, there was a significant difference between the flow of male and female as the flow in male is much greater than female (68.4 vs 131.16 at 0 min and 66.8 vs 119.05 at 60 min). Refer to the Figure 2 for reference.
