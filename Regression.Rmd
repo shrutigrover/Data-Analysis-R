@@ -1,0 +1,190 @@
+---
+title: "Regression Problems and check Regression Models for Air Quality"
+author: Shruti Grover
+date: July 17, 2019
+output: html_document
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+  encoding=encoding,
+  output_file=file.path(dirname(input_file), out_dir, 'regression.html'))})
+---
+
+**Q1. Objective :** 
+To identify correct regression, dependent and independent variable and if they are categorical or continuous -
+
+i. Joseph would like to know what demographic factors (i.e., sex, age, race) are related to colorectal tumor diameter in cancer patients.
+Ans.  
+This is a case of Linear Regression, particularly, Statistical Multiple Regression.
+Dependent variable - Colorectal tumor diameter(Continuous)
+Independent variables - sex(Categorical), age(Continuous/Categorical) and race(Categorical)
+
+
+ii. Priya is interested in determining whether the number of drivers pulled over for speeding is impacted by the day of the week in Ontario.
+Ans.
+This is a case of Poisson Regression as dependent variable is count.
+Dependent variable - Number of drivers pulled over(Continuous) 
+Independent variable - Day of the week(Categorical)
+
+iii. Josie would like to investigate whether consideration of sleep duration improves the prediction of academic grades above and beyond the duration of studying hours.
+Ans.
+This is a case of Linear Regression, particularly, Hierarchical Multiple Regression as we are comparing 2 models:
+
+Model 1-
+Dependent variable - Academic grades(Continuous)
+Independent variable - Duration of study hours(Continuous) 
+
+Model 2- 
+Dependent variable - academic grades(Continuous)
+Independent variable - Duration of study hours(Continuous) + Sleep Duration(Continuous)
+
+iv. Kevin would like to be able to predict whether older adults will snore or not based on their age group (50s, 60s or 70s), gender, and type of pillow (soft or hard).
+Ans.
+This is a case of Logistic Regression as the dependent variable is yes or no.
+Dependent variable - Snore or not(Categorical)
+Independent variable - age group(Categorical) + Gender(Categorical) + Type of Pillow(Categorical)
+
+
+```{r}
+# Lots of packages
+library(tidyverse)  #Data management
+library(QuantPsyc)  #Regression standardized betas
+library(ggpubr)     #Add regression information to graphs
+# Packages for Assumption Testing
+library(Hmisc)      #rcorr function
+library(lawstat)    #runs.test for regression
+library(lmtest)     #Durbin-Watson test
+library(datasets)        #Variance Inflation Factor
+library(MASS)       #stepAIC function for stepwise regression (but no details)
+library(olsrr)      #Stepwise regression functions
+```
+
+
+**Q2. Objective :**
+From the output from a Poisson regression that investigated whether the number of cases of esophageal cancer is related to the age group (20s, 30s, 40s, 50s, 60s, 70s) and alcohol consumption (Low, Occasional, Frequent, Excessive) of an individual, identify :
+
+i. What does the estimate of the Intercept indicate?
+Ans.
+Estimate of Intercept is the average number of cases(count) of esophageal cancer with all the base predictors. R assigns the first level of the predictors as the base. In the given example, age group of 30s and alcohol consumption of Occasional are the base predictors. Hence, exponential of the intercept exp(0.09)=1.09 estimate gives the average number of esophageal cases for 30s age group and occasional alcohol consumption. Hence, in this case the value of ~1 case for the base conditions is insignificant and can be ignored. 
+
+ii.What do significant (p<0.05) p-values of the coefficients indicate?
+Ans.
+The p-values of the coefficients indicate that there is a significant effect of the coefficient on count as compared to the base coefficient(intercept). For instance, here age group 40s has a p < 0.05 showing that the predicted esphageal cancer count in age group of 40s is 4.8 (i.e., exp(1.57)) times more than that in age group 30s and the difference is statistically significant. 
+
+iii.Interpret the output for age_A60 coefficient.
+Ans.
+The expected esphageal cancer count predicted in age group 60s is exp(1.85) = 6.35 times more than in age group 30s(base) and the difference is statistically significant with a P value < 0.05.
+
+iv. Running a second Poisson regression without considering alcohol consumption and finding the AIC value to be 384.33. What does this tell about the relative strengths of the models?
+Ans.
+The AIC(Akaike Information Criterion) is used to compare the residual model with variables to the null model. It measures the discrepancy between the fitted values and the actual values. Hence, a lower value of AIC is preferred for model to be a good fit. Considering the alcohol consumption and age in the model, the AIC value is 288.26. Running a second Poisson regression without considering alcohol consumption resulting in AIC of 384.33 (> 288.26) which indicates that the model with both age and alcohol consumption as predictors is a better fit than model with just age. Hence, alcohol consumption is a significant predictor and should be considered in the model.
+
+**Q3. Objective :**
+To investigate which of Solar.R, Wind and Temp are the best predictors of Ozone quality.
+```{r}
+#Removing rows with NAs
+df_air <- na.omit(airquality)
+str(df_air)
+```
+
+Multiple Statistical Regression is used to build the model and find which predictors are the best-
+```{r}
+mod <- lm(Ozone ~ Solar.R + Wind + Temp, data = df_air)
+summary(mod)
+```
+From the above summary, we can see that for all 3 predictors the p < 0.05, meaning they are individually better compared to the null model. To find which predictors are the best, 2 methods were performed -
+
+1. Find all possible combinations of predictors:
+```{r}
+k <- ols_step_all_possible(mod) #Theoretically all models
+k
+```
+In the above table, the summary of all possible models is given. It can be observed that the model consisiting of all 3 independent variables - Solar.R, Wind and Temp accounts for the highest Adj. R-square(59.4%) which shows that this model has the highest explained variance and hence is the best. This is followed by model consisiting of only Wind and Temp.
+
+The plot below also reflects the above information.
+```{r}
+plot(k)
+```
+
+2. Backward Statistical Regression:
+```{r}
+backward <- ols_step_backward_p(mod, prem = 0.5, details = TRUE) #prem default is 0.3
+backward
+```
+Also, after performing the backward type statistical regression, no variable was removed that means all 3 Independent variables have significant effect on Ozone.
+
+Assumption Testing-
+
+**Assumption 1: Continuous**
+From below, it can be seen that Solar.R , Wind and Temp are Continuous variables
+```{r}
+str(df_air) 
+```
+
+
+**Assumption 2: Independence**
+The Ozone values are independent from each other as each value is measured with a different set of conditions of Solar.R, wind and temp on different days and month. Hence, the assumption is satisfied.
+
+
+**Assumption 3: Non-zero variance of predictors**
+Solar.R , Wind and Temp have non zero variance
+```{r}
+print("Assumption 3 - Solar.R , Wind and Temp have non zero variance ")
+options(scipen = 9999)
+apply(df_air, 2, var)
+```
+
+**Assumption 4: The regression model is linear in predictors**
+Solar.R , Wind and Temp(IV) have significant p-values for correlations with Ozone(DV) means there is a linear relationship among variables and outcome
+```{r}
+Hmisc::rcorr(as.matrix(df_air), type = "pearson")
+```
+
+
+**Assumption 5: Multicollinearity**
+VIF value less than 10 indicates Solar.R , Wind and Temp are not highly correlated
+```{r}
+car::vif(mod)
+```
+
+**Assumption 6: Homoscedasticity**
+From the plots below(both standardised and unstandardised), it can be seen that the points are equally distributed across all values of the independent variables.
+
+**Assumption 7: Normality of residuals**
+QQ-plot shows normal distribution.
+
+**Assumption 8: Cook's distance**
+It can be seen from the plot that cook's distance stays within the extreme bounds so there are no highly influential points
+```{r}
+par(mfrow = c(2,2))  #Set plotting window to a 2x2 orientation
+plot(mod)           #Plot all regression plots
+par(mfrow = c(1,1))  #Set plotting window back to single
+```
+
+**Assumption 9: Independence of residuals**
+Plot for lag function shows that there is no order in the residuals.
+Also, Runs test shows that p value is not significant means residuals do not differ from straight line.
+Durbin-Watson Test gives DW = 1.9355, 1.5-2.5 is normal. Hence, there is no autocorrelation in variables.
+```{r}
+stats::acf(mod$residuals)         
+lawstat::runs.test(mod$residuals) 
+lmtest::dwtest(mod)               
+```
+
+**Assumption 10: The mean of residuals is zero**
+```{r}
+mean(mod$residuals)
+```
+
+**Assumption 11: X variables and residuals are uncorrelated**
+Predictors(Solar.R, Wind and Temp) and residuals are uncorrelated(correlation coeff is 0) and also the p > 0.05 indicates that there is no correlation.
+```{r}
+df_air.res <- data.frame(df_air, mod$residuals)
+Hmisc::rcorr(as.matrix(df_air.res), type = "pearson")
+```
+
+
+**Assumption 12: The number of observations must be greater than the number of Xs**
+Here we have 111 observations and the model consists of 3 predictor which means we need 50 + 3 * 8 = 74 and we have more observations(111) which is sufficient.
+
+Hence, all the assumptions are satisfied.
